@@ -1,6 +1,6 @@
 [package]
 name = "bevy_egui"
-version = "0.31.0"
+version = "0.31.1"
 # Needed for LazyLock https://doc.rust-lang.org/stable/std/sync/struct.LazyLock.html
 rust-version = "1.80.0"
 authors = ["mvlabat <mvlabat@gmail.com>"]
@@ -11,7 +11,7 @@ repository = "https://github.com/mvlabat/bevy_egui"
 exclude = ["assets/**/*", ".github/**/*"]
 
 [package.metadata.docs.rs]
-features = ["bevy/x11"]
+features = ["bevy_winit/x11"]
 all-features = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
