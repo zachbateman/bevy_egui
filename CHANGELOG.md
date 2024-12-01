@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.31.1] - 30-Nov-2024
 
-- Fix docs.rs build
+### Fixed
+
+- Fix docs.rs build.
 
 ## [0.31.0] - 30-Nov-2024
 
