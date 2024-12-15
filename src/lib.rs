@@ -8,12 +8,19 @@
 //!
 //! **Features:**
 //! - Desktop and web platforms support
-//! - Clipboard (web support is limited to the same window, see [rust-windowing/winit#1829](https://github.com/rust-windowing/winit/issues/1829))
+//! - Clipboard
 //! - Opening URLs
-//! - Multiple windows support (see [./examples/two_windows.rs](https://github.com/vladbat00/bevy_egui/blob/v0.20.1/examples/two_windows.rs))
+//! - Multiple windows support (see [./examples/two_windows.rs](https://github.com/vladbat00/bevy_egui/blob/v0.29.0/examples/two_windows.rs))
+//! - Paint callback support (see [./examples/paint_callback.rs](https://github.com/vladbat00/bevy_egui/blob/v0.29.0/examples/paint_callback.rs))
+//! - Mobile web virtual keyboard (still rough support and only works without prevent_default_event_handling set to false on the WindowPlugin primary_window)
 //!
-//! `bevy_egui` can be compiled with using only `bevy` and `egui` as dependencies: `manage_clipboard` and `open_url` features,
-//! that require additional crates, can be disabled.
+//! ## Dependencies
+//!
+//! On Linux, this crate requires certain parts of [XCB](https://xcb.freedesktop.org/) to be installed on your system. On Debian-based systems, these can be installed with the following command:
+//!
+//! ```
+//! $ sudo apt install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+//! ```
 //!
 //! ## Usage
 //!
