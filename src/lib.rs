@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![allow(clippy::type_complexity)]
 
 //! This crate provides an [Egui](https://github.com/emilk/egui) integration for the [Bevy](https://github.com/bevyengine/bevy) game engine.
 //!
@@ -34,8 +35,8 @@
 //!     App::new()
 //!         .add_plugins(DefaultPlugins)
 //!         .add_plugins(EguiPlugin)
-//!         // Systems that create Egui widgets should be run during the `CoreSet::Update` set,
-//!         // or after the `EguiSet::BeginPass` system (which belongs to the `CoreSet::PreUpdate` set).
+//!         // Systems that create Egui widgets should be run during the `Update` Bevy schedule,
+//!         // or after the `EguiPreUpdateSet::BeginPass` system (which belongs to the `PreUpdate` Bevy schedule).
 //!         .add_systems(Update, ui_example_system)
 //!         .run();
 //! }
@@ -57,40 +58,33 @@
 //!
 //! - [`bevy-inspector-egui`](https://github.com/jakobhellermann/bevy-inspector-egui)
 
-#[cfg(all(
-    feature = "manage_clipboard",
-    target_arch = "wasm32",
-    not(web_sys_unstable_apis)
-))]
-compile_error!(include_str!("../static/error_web_sys_unstable_apis.txt"));
-
 /// Egui render node.
 #[cfg(feature = "render")]
 pub mod egui_node;
-/// Egui render node for rendering to a texture.
+/// Helpers for converting Bevy types into Egui ones and vice versa.
+pub mod helpers;
+/// Systems for translating Bevy input events into Egui input.
+pub mod input;
+/// Systems for handling Egui output.
+pub mod output;
 /// Plugin systems for the render app.
 #[cfg(feature = "render")]
 pub mod render_systems;
-/// Plugin systems.
-pub mod systems;
-/// Mobile web keyboard hacky input support
+/// Mobile web keyboard input support.
 #[cfg(target_arch = "wasm32")]
-mod text_agent;
-/// Clipboard management for web
-#[cfg(all(
-    feature = "manage_clipboard",
-    target_arch = "wasm32",
-    web_sys_unstable_apis
-))]
+pub mod text_agent;
+/// Clipboard management for web.
+#[cfg(all(feature = "manage_clipboard", target_arch = "wasm32",))]
 pub mod web_clipboard;
 
 pub use egui;
 
-use crate::systems::*;
+use crate::input::*;
 #[cfg(target_arch = "wasm32")]
 use crate::text_agent::{
-    install_text_agent, is_mobile_safari, process_safari_virtual_keyboard, propagate_text,
-    SafariVirtualKeyboardHack, TextAgentChannel, VirtualTouchInfo,
+    install_text_agent_system, is_mobile_safari, process_safari_virtual_keyboard_system,
+    write_text_agent_channel_events_system, SafariVirtualKeyboardTouchState, TextAgentChannel,
+    VirtualTouchInfo,
 };
 #[cfg(feature = "render")]
 use crate::{
@@ -129,8 +123,9 @@ use bevy_render::{
     render_resource::{LoadOp, SpecializedRenderPipelines},
     ExtractSchedule, Render, RenderApp, RenderSet,
 };
-use bevy_window::{PrimaryWindow, SystemCursorIcon, Window};
+use bevy_window::{PrimaryWindow, Window};
 use bevy_winit::cursor::CursorIcon;
+use output::process_output_system;
 #[cfg(all(
     feature = "manage_clipboard",
     not(any(target_arch = "wasm32", target_os = "android"))
@@ -141,6 +136,24 @@ use wasm_bindgen::prelude::*;
 
 /// Adds all Egui resources and render graph nodes.
 pub struct EguiPlugin;
+
+/// A resource for storing global plugin settings.
+#[derive(Clone, Debug, Resource, Reflect)]
+pub struct EguiGlobalSettings {
+    /// Set this to `false` if you want to disable updating focused contexts by the plugin's systems
+    /// (enabled by default).
+    ///
+    /// For more info, see the [`FocusedNonWindowEguiContext`] documentation.
+    pub enable_focused_non_window_context_updates: bool,
+}
+
+impl Default for EguiGlobalSettings {
+    fn default() -> Self {
+        Self {
+            enable_focused_non_window_context_updates: true,
+        }
+    }
+}
 
 /// A component for storing Egui context settings.
 #[derive(Clone, Debug, Component, Reflect)]
@@ -168,7 +181,7 @@ pub struct EguiSettings {
     /// If not specified, `_self` will be used. Only matters in a web browser.
     #[cfg(feature = "open_url")]
     pub default_open_url_target: Option<String>,
-    /// Controls if Egui should capture pointer input when using [`bevy_picking`].
+    /// Controls if Egui should capture pointer input when using [`bevy_picking`] (i.e. suppress `bevy_picking` events when a pointer is over an Egui window).
     #[cfg(feature = "render")]
     pub capture_pointer_input: bool,
 }
@@ -199,11 +212,11 @@ impl Default for EguiSettings {
 
 /// Is used for storing Egui context input.
 ///
-/// It gets reset during the [`EguiSet::ProcessInput`] system.
+/// It gets reset during the [`crate::EguiInputSet::WriteEguiEvents`] system set.
 #[derive(Component, Clone, Debug, Default, Deref, DerefMut)]
 pub struct EguiInput(pub egui::RawInput);
 
-/// Is used to store Egui context output.
+/// Intermediate output buffer generated on an Egui pass end and consumed by the [`process_output_system`] system.
 #[derive(Component, Clone, Default, Deref, DerefMut)]
 pub struct EguiFullOutput(pub Option<egui::FullOutput>);
 
@@ -215,93 +228,8 @@ pub struct EguiFullOutput(pub Option<egui::FullOutput>);
 pub struct EguiClipboard {
     #[cfg(not(target_arch = "wasm32"))]
     clipboard: thread_local::ThreadLocal<Option<RefCell<Clipboard>>>,
-    #[cfg(all(target_arch = "wasm32", web_sys_unstable_apis))]
+    #[cfg(target_arch = "wasm32")]
     clipboard: web_clipboard::WebClipboard,
-}
-
-#[cfg(all(
-    feature = "manage_clipboard",
-    not(target_os = "android"),
-    not(all(target_arch = "wasm32", not(web_sys_unstable_apis)))
-))]
-impl EguiClipboard {
-    /// Sets clipboard contents.
-    pub fn set_contents(&mut self, contents: &str) {
-        self.set_contents_impl(contents);
-    }
-
-    /// Sets the internal buffer of clipboard contents.
-    /// This buffer is used to remember the contents of the last "Paste" event.
-    #[cfg(all(target_arch = "wasm32", web_sys_unstable_apis))]
-    pub fn set_contents_internal(&mut self, contents: &str) {
-        self.clipboard.set_contents_internal(contents);
-    }
-
-    /// Gets clipboard contents. Returns [`None`] if clipboard provider is unavailable or returns an error.
-    #[must_use]
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_contents(&mut self) -> Option<String> {
-        self.get_contents_impl()
-    }
-
-    /// Gets clipboard contents. Returns [`None`] if clipboard provider is unavailable or returns an error.
-    #[must_use]
-    #[cfg(all(target_arch = "wasm32", web_sys_unstable_apis))]
-    pub fn get_contents(&mut self) -> Option<String> {
-        self.get_contents_impl()
-    }
-
-    /// Receives a clipboard event sent by the `copy`/`cut`/`paste` listeners.
-    #[cfg(all(target_arch = "wasm32", web_sys_unstable_apis))]
-    pub fn try_receive_clipboard_event(&self) -> Option<web_clipboard::WebClipboardEvent> {
-        self.clipboard.try_receive_clipboard_event()
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn set_contents_impl(&mut self, contents: &str) {
-        if let Some(mut clipboard) = self.get() {
-            if let Err(err) = clipboard.set_text(contents.to_owned()) {
-                bevy_log::error!("Failed to set clipboard contents: {:?}", err);
-            }
-        }
-    }
-
-    #[cfg(all(target_arch = "wasm32", web_sys_unstable_apis))]
-    fn set_contents_impl(&mut self, contents: &str) {
-        self.clipboard.set_contents(contents);
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn get_contents_impl(&mut self) -> Option<String> {
-        if let Some(mut clipboard) = self.get() {
-            match clipboard.get_text() {
-                Ok(contents) => return Some(contents),
-                Err(err) => bevy_log::error!("Failed to get clipboard contents: {:?}", err),
-            }
-        };
-        None
-    }
-
-    #[cfg(all(target_arch = "wasm32", web_sys_unstable_apis))]
-    #[allow(clippy::unnecessary_wraps)]
-    fn get_contents_impl(&mut self) -> Option<String> {
-        self.clipboard.get_contents()
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn get(&self) -> Option<RefMut<Clipboard>> {
-        self.clipboard
-            .get_or(|| {
-                Clipboard::new()
-                    .map(RefCell::new)
-                    .map_err(|err| {
-                        bevy_log::error!("Failed to initialize clipboard: {:?}", err);
-                    })
-                    .ok()
-            })
-            .as_ref()
-            .map(|cell| cell.borrow_mut())
-    }
 }
 
 /// Is used for storing Egui shapes and textures delta.
@@ -310,7 +238,7 @@ impl EguiClipboard {
 pub struct EguiRenderOutput {
     /// Pairs of rectangles and paint commands.
     ///
-    /// The field gets populated during the [`EguiSet::ProcessOutput`] system (belonging to bevy's [`PostUpdate`]) and reset during `EguiNode::update`.
+    /// The field gets populated during the [`EguiPostUpdateSet::ProcessOutput`] system (belonging to bevy's [`PostUpdate`]) and reset during [`egui_node::EguiNode`]'s `update`.
     pub paint_jobs: Vec<egui::ClippedPrimitive>,
 
     /// The change in egui textures since last frame.
@@ -318,27 +246,36 @@ pub struct EguiRenderOutput {
 }
 
 impl EguiRenderOutput {
-    /// Returns `true` if the output has no Egui shapes and no textures delta
+    /// Returns `true` if the output has no Egui shapes and no textures delta.
     pub fn is_empty(&self) -> bool {
         self.paint_jobs.is_empty() && self.textures_delta.is_empty()
     }
 }
 
-/// Is used for storing Egui output.
+/// Stores last Egui output.
 #[derive(Component, Clone, Default)]
 pub struct EguiOutput {
-    /// The field gets updated during the [`EguiSet::ProcessOutput`] system (belonging to [`PostUpdate`]).
+    /// The field gets updated during the [`EguiPostUpdateSet::ProcessOutput`] system (belonging to [`PostUpdate`]).
     pub platform_output: egui::PlatformOutput,
 }
 
 /// A component for storing `bevy_egui` context.
 #[derive(Clone, Component, Default)]
 #[cfg_attr(feature = "render", derive(ExtractComponent))]
+#[require(
+    EguiSettings,
+    EguiInput,
+    EguiContextPointerPosition,
+    EguiContextPointerTouchId,
+    EguiContextImeState,
+    EguiFullOutput,
+    EguiRenderOutput,
+    EguiOutput,
+    RenderTargetSize,
+    CursorIcon
+)]
 pub struct EguiContext {
     ctx: egui::Context,
-    mouse_position: egui::Pos2,
-    pointer_touch_id: Option<u64>,
-    has_sent_ime_enabled: bool,
 }
 
 impl EguiContext {
@@ -401,7 +338,7 @@ impl EguiContexts<'_, '_> {
     #[must_use]
     pub fn ctx_mut(&mut self) -> &mut egui::Context {
         self.try_ctx_mut()
-            .expect("`EguiContexts::ctx_mut` was called for an uninitialized context (primary window), make sure your system is run after [`EguiSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)")
+            .expect("`EguiContexts::ctx_mut` was called for an uninitialized context (primary window), make sure your system is run after [`EguiPreUpdateSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)")
     }
 
     /// Fallible variant of [`EguiContexts::ctx_mut`].
@@ -422,7 +359,7 @@ impl EguiContexts<'_, '_> {
     #[must_use]
     pub fn ctx_for_entity_mut(&mut self, entity: Entity) -> &mut egui::Context {
         self.try_ctx_for_entity_mut(entity)
-            .unwrap_or_else(|| panic!("`EguiContexts::ctx_for_window_mut` was called for an uninitialized context (entity {entity:?}), make sure your system is run after [`EguiSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)"))
+            .unwrap_or_else(|| panic!("`EguiContexts::ctx_for_window_mut` was called for an uninitialized context (entity {entity:?}), make sure your system is run after [`EguiPreUpdateSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)"))
     }
 
     /// Fallible variant of [`EguiContexts::ctx_for_entity_mut`].
@@ -465,7 +402,7 @@ impl EguiContexts<'_, '_> {
     #[must_use]
     pub fn ctx(&self) -> &egui::Context {
         self.try_ctx()
-            .expect("`EguiContexts::ctx` was called for an uninitialized context (primary window), make sure your system is run after [`EguiSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)")
+            .expect("`EguiContexts::ctx` was called for an uninitialized context (primary window), make sure your system is run after [`EguiPreUpdateSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)")
     }
 
     /// Fallible variant of [`EguiContexts::ctx`].
@@ -504,7 +441,7 @@ impl EguiContexts<'_, '_> {
     #[cfg(feature = "immutable_ctx")]
     pub fn ctx_for_entity(&self, entity: Entity) -> &egui::Context {
         self.try_ctx_for_entity(entity)
-            .unwrap_or_else(|| panic!("`EguiContexts::ctx_for_entity` was called for an uninitialized context (entity {entity:?}), make sure your system is run after [`EguiSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)"))
+            .unwrap_or_else(|| panic!("`EguiContexts::ctx_for_entity` was called for an uninitialized context (entity {entity:?}), make sure your system is run after [`EguiPreUpdateSet::InitContexts`] (or [`EguiStartupSet::InitContexts`] for startup systems)"))
     }
 
     /// Fallible variant of [`EguiContexts::ctx_for_entity`].
@@ -566,6 +503,7 @@ impl EguiContexts<'_, '_> {
 /// automatically.
 #[cfg(feature = "render")]
 #[derive(Component, Clone, Debug, ExtractComponent)]
+#[require(EguiContext)]
 pub struct EguiRenderToImage {
     /// A handle of an image to render to.
     pub handle: Handle<Image>,
@@ -696,26 +634,54 @@ pub enum EguiStartupSet {
     InitContexts,
 }
 
-/// The `bevy_egui` plugin system sets.
+/// System sets that run during the [`PreUpdate`] schedule.
 #[derive(SystemSet, Clone, Hash, Debug, Eq, PartialEq)]
-pub enum EguiSet {
+pub enum EguiPreUpdateSet {
     /// Initializes Egui contexts for newly created render targets.
     InitContexts,
     /// Reads Egui inputs (keyboard, mouse, etc) and writes them into the [`EguiInput`] resource.
     ///
     /// To modify the input, you can hook your system like this:
     ///
-    /// `system.after(EguiSet::ProcessInput).before(EguiSet::BeginPass)`.
+    /// `system.after(EguiPreUpdateSet::ProcessInput).before(EguiSet::BeginPass)`.
     ProcessInput,
     /// Begins the `egui` pass.
     BeginPass,
-    /// Processes the [`EguiOutput`] resource.
+}
+
+/// Subsets of the [`EguiPreUpdateSet::ProcessInput`] set.
+#[derive(SystemSet, Clone, Hash, Debug, Eq, PartialEq)]
+pub enum EguiInputSet {
+    /// Reads key modifiers state and pointer positions.
+    ///
+    /// This is where [`HoveredNonWindowEguiContext`] should get inserted or removed.
+    InitReading,
+    /// Processes window mouse button click and touch events, updates [`FocusedNonWindowEguiContext`] based on [`HoveredNonWindowEguiContext`].
+    FocusContext,
+    /// Processes rest of the events for both window and non-window contexts.
+    ReadBevyEvents,
+    /// Feeds all the events into [`EguiInput`].
+    WriteEguiEvents,
+}
+
+/// System sets that run during the [`PostUpdate`] schedule.
+#[derive(SystemSet, Clone, Hash, Debug, Eq, PartialEq)]
+pub enum EguiPostUpdateSet {
+    /// Ends Egui pass.
+    EndPass,
+    /// Processes Egui output, reads paint jobs for the renderer.
     ProcessOutput,
+    /// Post-processing of Egui output (updates textures, browser virtual keyboard state, etc).
+    PostProcessOutput,
 }
 
 impl Plugin for EguiPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<EguiGlobalSettings>();
         app.register_type::<EguiSettings>();
+        app.init_resource::<EguiGlobalSettings>();
+        app.init_resource::<ModifierKeysState>();
+        app.add_event::<EguiInputEvent>();
 
         #[cfg(feature = "render")]
         {
@@ -736,47 +702,93 @@ impl Plugin for EguiPlugin {
         #[cfg(all(feature = "manage_clipboard", not(target_os = "android")))]
         app.init_resource::<EguiClipboard>();
 
-        #[cfg(all(
-            feature = "manage_clipboard",
-            target_arch = "wasm32",
-            web_sys_unstable_apis
-        ))]
-        {
-            app.add_systems(PreStartup, web_clipboard::startup_setup_web_events);
-        }
+        app.configure_sets(
+            PreUpdate,
+            (
+                EguiPreUpdateSet::InitContexts,
+                EguiPreUpdateSet::ProcessInput.after(InputSystem),
+                EguiPreUpdateSet::BeginPass,
+            )
+                .chain(),
+        );
+        app.configure_sets(
+            PreUpdate,
+            (
+                EguiInputSet::InitReading,
+                EguiInputSet::FocusContext,
+                EguiInputSet::ReadBevyEvents,
+                EguiInputSet::WriteEguiEvents,
+            )
+                .chain(),
+        );
+        app.configure_sets(
+            PostUpdate,
+            (
+                EguiPostUpdateSet::EndPass,
+                EguiPostUpdateSet::ProcessOutput,
+                EguiPostUpdateSet::PostProcessOutput,
+            )
+                .chain(),
+        );
 
+        // Startup systems.
+        #[cfg(all(feature = "manage_clipboard", target_arch = "wasm32",))]
+        {
+            app.add_systems(PreStartup, web_clipboard::startup_setup_web_events_system);
+        }
         app.add_systems(
             PreStartup,
             (
                 setup_new_windows_system,
-                #[cfg(feature = "render")]
-                setup_render_to_image_handles_system,
                 apply_deferred,
-                update_contexts_system,
+                update_ui_size_and_scale_system,
             )
                 .chain()
                 .in_set(EguiStartupSet::InitContexts),
         );
 
+        // PreUpdate systems.
         app.add_systems(
             PreUpdate,
             (
                 setup_new_windows_system,
-                #[cfg(feature = "render")]
-                setup_render_to_image_handles_system,
                 apply_deferred,
-                update_contexts_system,
+                update_ui_size_and_scale_system,
             )
                 .chain()
-                .in_set(EguiSet::InitContexts),
+                .in_set(EguiPreUpdateSet::InitContexts),
         );
         app.add_systems(
             PreUpdate,
-            process_input_system
-                .in_set(EguiSet::ProcessInput)
-                .after(InputSystem)
-                .after(EguiSet::InitContexts),
+            (
+                (
+                    write_modifiers_keys_state_system,
+                    write_window_pointer_moved_events_system,
+                )
+                    .in_set(EguiInputSet::InitReading),
+                (
+                    write_pointer_button_events_system,
+                    write_window_touch_events_system,
+                )
+                    .in_set(EguiInputSet::FocusContext),
+                (
+                    write_non_window_pointer_moved_events_system,
+                    write_mouse_wheel_events_system,
+                    write_keyboard_input_events_system,
+                    write_ime_events_system,
+                )
+                    .in_set(EguiInputSet::ReadBevyEvents),
+                write_egui_input_system.in_set(EguiInputSet::WriteEguiEvents),
+            )
+                .chain()
+                .in_set(EguiPreUpdateSet::ProcessInput),
         );
+        app.add_systems(
+            PreUpdate,
+            begin_pass_system.in_set(EguiPreUpdateSet::BeginPass),
+        );
+
+        // Web-specific resources and systems.
         #[cfg(target_arch = "wasm32")]
         {
             use std::sync::{LazyLock, Mutex};
@@ -797,7 +809,7 @@ impl Plugin for EguiPlugin {
                 static TOUCH_INFO: LazyLock<Mutex<VirtualTouchInfo>> =
                     LazyLock::new(|| Mutex::new(VirtualTouchInfo::default()));
 
-                app.insert_resource(SafariVirtualKeyboardHack {
+                app.insert_resource(SafariVirtualKeyboardTouchState {
                     sender,
                     receiver,
                     touch_info: &TOUCH_INFO,
@@ -805,49 +817,50 @@ impl Plugin for EguiPlugin {
 
                 app.add_systems(
                     PreStartup,
-                    install_text_agent
-                        .in_set(EguiSet::ProcessInput)
-                        .after(process_input_system)
-                        .after(InputSystem)
-                        .after(EguiSet::InitContexts),
+                    install_text_agent_system.in_set(EguiStartupSet::InitContexts),
                 );
 
                 app.add_systems(
                     PreUpdate,
-                    propagate_text
-                        .in_set(EguiSet::ProcessInput)
-                        .after(process_input_system)
-                        .after(InputSystem)
-                        .after(EguiSet::InitContexts),
+                    write_text_agent_channel_events_system
+                        .in_set(EguiPreUpdateSet::ProcessInput)
+                        .in_set(EguiInputSet::ReadBevyEvents),
+                );
+
+                #[cfg(feature = "manage_clipboard")]
+                app.add_systems(
+                    PreUpdate,
+                    web_clipboard::write_web_clipboard_events_system
+                        .in_set(EguiPreUpdateSet::ProcessInput)
+                        .in_set(EguiInputSet::ReadBevyEvents),
                 );
 
                 if is_mobile_safari() {
                     app.add_systems(
                         PostUpdate,
-                        process_safari_virtual_keyboard.after(process_output_system),
+                        process_safari_virtual_keyboard_system
+                            .in_set(EguiPostUpdateSet::PostProcessOutput),
                     );
                 }
             }
         }
-        app.add_systems(
-            PreUpdate,
-            begin_pass_system
-                .in_set(EguiSet::BeginPass)
-                .after(EguiSet::ProcessInput),
-        );
 
-        app.add_systems(PostUpdate, end_pass_system.before(EguiSet::ProcessOutput));
+        // PostUpdate systems.
         app.add_systems(
             PostUpdate,
-            process_output_system.in_set(EguiSet::ProcessOutput),
+            end_pass_system.in_set(EguiPostUpdateSet::EndPass),
+        );
+        app.add_systems(
+            PostUpdate,
+            process_output_system.in_set(EguiPostUpdateSet::ProcessOutput),
         );
         #[cfg(feature = "render")]
-        app.add_systems(PostUpdate, capture_pointer_input);
+        app.add_systems(PostUpdate, capture_pointer_input_system);
 
         #[cfg(feature = "render")]
         app.add_systems(
             PostUpdate,
-            update_egui_textures_system.after(EguiSet::ProcessOutput),
+            update_egui_textures_system.in_set(EguiPostUpdateSet::PostProcessOutput),
         )
         .add_systems(
             Render,
@@ -906,56 +919,6 @@ impl Plugin for EguiPlugin {
     }
 }
 
-/// Queries all the Egui related components.
-#[derive(QueryData)]
-#[query_data(mutable)]
-#[non_exhaustive]
-pub struct EguiContextQuery {
-    /// Window entity.
-    pub render_target: Entity,
-    /// Egui context associated with the render target.
-    pub ctx: &'static mut EguiContext,
-    /// Settings associated with the context.
-    pub egui_settings: &'static mut EguiSettings,
-    /// Encapsulates [`egui::RawInput`].
-    pub egui_input: &'static mut EguiInput,
-    /// Encapsulates [`egui::FullOutput`].
-    pub egui_full_output: &'static mut EguiFullOutput,
-    /// Egui shapes and textures delta.
-    pub render_output: &'static mut EguiRenderOutput,
-    /// Encapsulates [`egui::PlatformOutput`].
-    pub egui_output: &'static mut EguiOutput,
-    /// Stores physical size of the window and its scale factor.
-    pub render_target_size: &'static mut RenderTargetSize,
-    /// [`Window`] component, when rendering to a window.
-    pub window: Option<&'static mut Window>,
-    /// [`CursorIcon`] component.
-    pub cursor: Option<&'static mut CursorIcon>,
-    /// [`EguiRenderToImage`] component, when rendering to a texture.
-    #[cfg(feature = "render")]
-    pub render_to_image: Option<&'static mut EguiRenderToImage>,
-}
-
-impl EguiContextQueryItem<'_> {
-    fn ime_event_enable(&mut self) {
-        if !self.ctx.has_sent_ime_enabled {
-            self.egui_input
-                .events
-                .push(egui::Event::Ime(egui::ImeEvent::Enabled));
-            self.ctx.has_sent_ime_enabled = true;
-        }
-    }
-
-    fn ime_event_disable(&mut self) {
-        if self.ctx.has_sent_ime_enabled {
-            self.egui_input
-                .events
-                .push(egui::Event::Ime(egui::ImeEvent::Disabled));
-            self.ctx.has_sent_ime_enabled = false;
-        }
-    }
-}
-
 /// Contains textures allocated and painted by Egui.
 #[cfg(feature = "render")]
 #[derive(bevy_ecs::system::Resource, Deref, DerefMut, Default)]
@@ -976,35 +939,111 @@ pub fn setup_new_windows_system(
     new_windows: Query<Entity, (Added<Window>, Without<EguiContext>)>,
 ) {
     for window in new_windows.iter() {
-        commands.entity(window).insert((
-            EguiContext::default(),
-            EguiSettings::default(),
-            EguiRenderOutput::default(),
-            EguiInput::default(),
-            EguiFullOutput::default(),
-            EguiOutput::default(),
-            RenderTargetSize::default(),
-            CursorIcon::System(SystemCursorIcon::Default),
-        ));
+        // See the list of required components to check the full list of components we add.
+        commands.entity(window).insert(EguiContext::default());
     }
 }
 
-/// The ordering value used for bevy_picking.
+#[cfg(all(feature = "manage_clipboard", not(target_os = "android"),))]
+impl EguiClipboard {
+    /// Sets clipboard contents.
+    pub fn set_contents(&mut self, contents: &str) {
+        self.set_contents_impl(contents);
+    }
+
+    /// Sets the internal buffer of clipboard contents.
+    /// This buffer is used to remember the contents of the last "Paste" event.
+    #[cfg(target_arch = "wasm32")]
+    pub fn set_contents_internal(&mut self, contents: &str) {
+        self.clipboard.set_contents_internal(contents);
+    }
+
+    /// Gets clipboard contents. Returns [`None`] if clipboard provider is unavailable or returns an error.
+    #[must_use]
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn get_contents(&mut self) -> Option<String> {
+        self.get_contents_impl()
+    }
+
+    /// Gets clipboard contents. Returns [`None`] if clipboard provider is unavailable or returns an error.
+    #[must_use]
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_contents(&mut self) -> Option<String> {
+        self.get_contents_impl()
+    }
+
+    /// Receives a clipboard event sent by the `copy`/`cut`/`paste` listeners.
+    #[cfg(target_arch = "wasm32")]
+    pub fn try_receive_clipboard_event(&self) -> Option<web_clipboard::WebClipboardEvent> {
+        self.clipboard.try_receive_clipboard_event()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_contents_impl(&mut self, contents: &str) {
+        if let Some(mut clipboard) = self.get() {
+            if let Err(err) = clipboard.set_text(contents.to_owned()) {
+                bevy_log::error!("Failed to set clipboard contents: {:?}", err);
+            }
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn set_contents_impl(&mut self, contents: &str) {
+        self.clipboard.set_contents(contents);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn get_contents_impl(&mut self) -> Option<String> {
+        if let Some(mut clipboard) = self.get() {
+            match clipboard.get_text() {
+                Ok(contents) => return Some(contents),
+                Err(err) => bevy_log::error!("Failed to get clipboard contents: {:?}", err),
+            }
+        };
+        None
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    #[allow(clippy::unnecessary_wraps)]
+    fn get_contents_impl(&mut self) -> Option<String> {
+        self.clipboard.get_contents()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn get(&self) -> Option<RefMut<Clipboard>> {
+        self.clipboard
+            .get_or(|| {
+                Clipboard::new()
+                    .map(RefCell::new)
+                    .map_err(|err| {
+                        bevy_log::error!("Failed to initialize clipboard: {:?}", err);
+                    })
+                    .ok()
+            })
+            .as_ref()
+            .map(|cell| cell.borrow_mut())
+    }
+}
+
+/// The ordering value used for [`bevy_picking`].
 #[cfg(feature = "render")]
 pub const PICKING_ORDER: f32 = 1_000_000.0;
-/// Captures pointers on egui windows for bevy_picking.
+
+/// Captures pointers on egui windows for [`bevy_picking`].
 #[cfg(feature = "render")]
-pub fn capture_pointer_input(
+pub fn capture_pointer_input_system(
     pointers: Query<(&PointerId, &PointerLocation)>,
-    mut egui_context: Query<(Entity, &mut EguiContext, &EguiSettings)>,
+    mut egui_context: Query<(Entity, &mut EguiContext, &EguiSettings), With<Window>>,
     mut output: EventWriter<PointerHits>,
 ) {
+    use helpers::QueryHelper;
+
     for (pointer, location) in pointers
         .iter()
         .filter_map(|(i, p)| p.location.as_ref().map(|l| (i, l)))
     {
         if let NormalizedRenderTarget::Window(id) = location.target {
-            if let Ok((entity, mut ctx, settings)) = egui_context.get_mut(id.entity()) {
+            if let Some((entity, mut ctx, settings)) = egui_context.get_some_mut(id.entity()) {
                 if settings.capture_pointer_input && ctx.get_mut().wants_pointer_input() {
                     let entry = (entity, HitData::new(entity, 0.0, None, None));
                     output.send(PointerHits::new(
@@ -1018,28 +1057,8 @@ pub fn capture_pointer_input(
     }
 }
 
-/// Adds bevy_egui components to newly created windows.
-#[cfg(feature = "render")]
-pub fn setup_render_to_image_handles_system(
-    mut commands: Commands,
-    new_render_to_image_targets: Query<Entity, (Added<EguiRenderToImage>, Without<EguiContext>)>,
-) {
-    for render_to_image_target in new_render_to_image_targets.iter() {
-        commands.entity(render_to_image_target).insert((
-            EguiContext::default(),
-            EguiSettings::default(),
-            EguiRenderOutput::default(),
-            EguiInput::default(),
-            EguiFullOutput::default(),
-            EguiOutput::default(),
-            RenderTargetSize::default(),
-        ));
-    }
-}
-
 /// Updates textures painted by Egui.
 #[cfg(feature = "render")]
-#[allow(clippy::type_complexity)]
 pub fn update_egui_textures_system(
     mut egui_render_output: Query<
         (Entity, &mut EguiRenderOutput),
@@ -1103,7 +1122,6 @@ pub fn update_egui_textures_system(
 /// If you add textures via [`EguiContexts::add_image`] or [`EguiUserTextures::add_image`] by passing a weak handle,
 /// the systems ensures that corresponding Egui textures are cleaned up as well.
 #[cfg(feature = "render")]
-#[allow(clippy::type_complexity)]
 pub fn free_egui_textures_system(
     mut egui_user_textures: ResMut<EguiUserTextures>,
     mut egui_render_output: Query<
@@ -1150,7 +1168,7 @@ struct EventClosure<T> {
 #[cfg(target_arch = "wasm32")]
 #[derive(Default)]
 pub struct SubscribedEvents {
-    #[cfg(all(feature = "manage_clipboard", web_sys_unstable_apis))]
+    #[cfg(feature = "manage_clipboard")]
     clipboard_event_closures: Vec<EventClosure<web_sys::ClipboardEvent>>,
     composition_event_closures: Vec<EventClosure<web_sys::CompositionEvent>>,
     keyboard_event_closures: Vec<EventClosure<web_sys::KeyboardEvent>>,
@@ -1163,7 +1181,7 @@ impl SubscribedEvents {
     /// Use this method to unsubscribe from all stored events, this can be useful
     /// for gracefully destroying a Bevy instance in a page.
     pub fn unsubscribe_from_all_events(&mut self) {
-        #[cfg(all(feature = "manage_clipboard", web_sys_unstable_apis))]
+        #[cfg(feature = "manage_clipboard")]
         Self::unsubscribe_from_events(&mut self.clipboard_event_closures);
         Self::unsubscribe_from_events(&mut self.composition_event_closures);
         Self::unsubscribe_from_events(&mut self.keyboard_event_closures);
@@ -1190,39 +1208,99 @@ impl SubscribedEvents {
     }
 }
 
+#[derive(QueryData)]
+#[query_data(mutable)]
+#[allow(missing_docs)]
+pub struct UpdateUiSizeAndScaleQuery {
+    ctx: &'static mut EguiContext,
+    egui_input: &'static mut EguiInput,
+    render_target_size: &'static mut RenderTargetSize,
+    egui_settings: &'static EguiSettings,
+    window: Option<&'static Window>,
+    #[cfg(feature = "render")]
+    render_to_image: Option<&'static EguiRenderToImage>,
+}
+
+/// Updates UI [`egui::RawInput::screen_rect`] and calls [`egui::Context::set_pixels_per_point`].
+pub fn update_ui_size_and_scale_system(
+    mut contexts: Query<UpdateUiSizeAndScaleQuery>,
+    #[cfg(feature = "render")] images: Res<Assets<Image>>,
+) {
+    for mut context in contexts.iter_mut() {
+        let mut render_target_size = None;
+        if let Some(window) = context.window {
+            render_target_size = Some(RenderTargetSize::new(
+                window.physical_width() as f32,
+                window.physical_height() as f32,
+                window.scale_factor(),
+            ));
+        }
+        #[cfg(feature = "render")]
+        if let Some(EguiRenderToImage { handle, .. }) = context.render_to_image {
+            if let Some(image) = images.get(handle) {
+                let size = image.size_f32();
+                render_target_size = Some(RenderTargetSize {
+                    physical_width: size.x,
+                    physical_height: size.y,
+                    scale_factor: 1.0,
+                })
+            } else {
+                bevy_log::warn!("Invalid EguiRenderToImage handle: {handle:?}");
+            }
+        }
+
+        let Some(new_render_target_size) = render_target_size else {
+            bevy_log::error!("bevy_egui context without window or render to texture!");
+            continue;
+        };
+        let width = new_render_target_size.physical_width
+            / new_render_target_size.scale_factor
+            / context.egui_settings.scale_factor;
+        let height = new_render_target_size.physical_height
+            / new_render_target_size.scale_factor
+            / context.egui_settings.scale_factor;
+
+        if width < 1.0 || height < 1.0 {
+            continue;
+        }
+
+        context.egui_input.screen_rect = Some(egui::Rect::from_min_max(
+            egui::pos2(0.0, 0.0),
+            egui::pos2(width, height),
+        ));
+
+        context.ctx.get_mut().set_pixels_per_point(
+            new_render_target_size.scale_factor * context.egui_settings.scale_factor,
+        );
+
+        *context.render_target_size = new_render_target_size;
+    }
+}
+
+/// Marks a pass start for Egui.
+pub fn begin_pass_system(mut contexts: Query<(&mut EguiContext, &EguiSettings, &mut EguiInput)>) {
+    for (mut ctx, egui_settings, mut egui_input) in contexts.iter_mut() {
+        if !egui_settings.run_manually {
+            ctx.get_mut().begin_pass(egui_input.take());
+        }
+    }
+}
+
+/// Marks a pass end for Egui.
+pub fn end_pass_system(
+    mut contexts: Query<(&mut EguiContext, &EguiSettings, &mut EguiFullOutput)>,
+) {
+    for (mut ctx, egui_settings, mut full_output) in contexts.iter_mut() {
+        if !egui_settings.run_manually {
+            **full_output = Some(ctx.get_mut().end_pass());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use bevy::{
-        app::PluginGroup,
-        render::{settings::WgpuSettings, RenderPlugin},
-        winit::WinitPlugin,
-        DefaultPlugins,
-    };
-
     #[test]
     fn test_readme_deps() {
         version_sync::assert_markdown_deps_updated!("README.md");
-    }
-
-    #[test]
-    fn test_headless_mode() {
-        App::new()
-            .add_plugins(
-                DefaultPlugins
-                    .set(RenderPlugin {
-                        render_creation: bevy::render::settings::RenderCreation::Automatic(
-                            WgpuSettings {
-                                backends: None,
-                                ..Default::default()
-                            },
-                        ),
-                        ..Default::default()
-                    })
-                    .build()
-                    .disable::<WinitPlugin>(),
-            )
-            .add_plugins(EguiPlugin)
-            .update();
     }
 }
