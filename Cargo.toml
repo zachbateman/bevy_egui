@@ -1,9 +1,9 @@
 [package]
 name = "bevy_egui"
-version = "0.31.1"
+version = "0.32.0"
 # Needed for LazyLock https://doc.rust-lang.org/stable/std/sync/struct.LazyLock.html
 rust-version = "1.80.0"
-authors = ["mvlabat <mvlabat@gmail.com>"]
+authors = ["vladbat00 <vladyslav.batyrenko@gmail.com>"]
 description = "A plugin for Egui integration into Bevy"
 license = "MIT"
 edition = "2021"
