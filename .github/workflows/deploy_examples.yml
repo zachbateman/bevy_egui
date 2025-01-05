@@ -31,7 +31,8 @@ jobs:
         run: cargo install --git https://github.com/TheBevyFlock/bevy_cli bevy_cli
 
       - name: Build color_test
-        run: bevy build --example color_test web --bundle
+        # The first run may prompt to install dependencies, hence the `--yes` flag.
+        run: bevy build --yes --example color_test web --bundle
       - name: Build paint_callback
         run: bevy build --example paint_callback web --bundle
       - name: Build render_egui_to_image
@@ -44,7 +45,7 @@ jobs:
         run: bevy build --example simple web --bundle
       - name: Build simple_multipass
         run: bevy build --example simple_multipass web --bundle
-        # We skip the two_windows example as it's not supported in WASM
+      # We skip the two_windows example as it's not supported in WASM
       - name: Build ui
         run: bevy build --example ui web --bundle
 
