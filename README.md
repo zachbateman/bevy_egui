@@ -124,7 +124,7 @@ The same minimal example demonstrating running Egui passes manually.
 
 | bevy | bevy_egui |
 |------|-----------|
-| 0.15 | 0.31      |
+| 0.15 | 0.31-0.32 |
 | 0.14 | 0.28-0.30 |
 | 0.13 | 0.25-0.27 |
 | 0.12 | 0.23-0.24 |
