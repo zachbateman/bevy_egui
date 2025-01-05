@@ -6,6 +6,7 @@ use bevy_ecs::{
 use bevy_input::keyboard::{Key, KeyCode};
 
 /// Translates [`egui::CursorIcon`] into [`bevy_window::SystemCursorIcon`].
+#[inline(always)]
 pub fn egui_to_winit_cursor_icon(
     cursor_icon: egui::CursorIcon,
 ) -> Option<bevy_window::SystemCursorIcon> {
@@ -49,6 +50,7 @@ pub fn egui_to_winit_cursor_icon(
 }
 
 /// Matches the implementation of <https://github.com/emilk/egui/blob/68b3ef7f6badfe893d3bbb1f791b481069d807d9/crates/egui-winit/src/lib.rs#L1005>.
+#[inline(always)]
 pub fn bevy_to_egui_key(key: &Key) -> Option<egui::Key> {
     let key = match key {
         Key::Character(str) => return egui::Key::from_name(str.as_str()),
@@ -96,6 +98,7 @@ pub fn bevy_to_egui_key(key: &Key) -> Option<egui::Key> {
 }
 
 /// Matches the implementation of <https://github.com/emilk/egui/blob/68b3ef7f6badfe893d3bbb1f791b481069d807d9/crates/egui-winit/src/lib.rs#L1080>.
+#[inline(always)]
 pub fn bevy_to_egui_physical_key(key: &KeyCode) -> Option<egui::Key> {
     let key = match key {
         KeyCode::ArrowDown => egui::Key::ArrowDown,
@@ -198,23 +201,45 @@ pub fn bevy_to_egui_physical_key(key: &KeyCode) -> Option<egui::Key> {
 }
 
 /// Converts [`bevy_math::Vec2`] into [`egui::Pos2`].
+#[inline(always)]
 pub fn vec2_into_egui_pos2(vec: bevy_math::Vec2) -> egui::Pos2 {
     egui::Pos2::new(vec.x, vec.y)
 }
 
 /// Converts [`bevy_math::Vec2`] into [`egui::Vec2`].
+#[inline(always)]
 pub fn vec2_into_egui_vec2(vec: bevy_math::Vec2) -> egui::Vec2 {
     egui::Vec2::new(vec.x, vec.y)
 }
 
+/// Converts [`bevy_math::Rect`] into [`egui::Rect`].
+#[inline(always)]
+pub fn rect_into_egui_rect(rect: bevy_math::Rect) -> egui::Rect {
+    egui::Rect {
+        min: vec2_into_egui_pos2(rect.min),
+        max: vec2_into_egui_pos2(rect.max),
+    }
+}
+
 /// Converts [`egui::Pos2`] into [`bevy_math::Vec2`].
+#[inline(always)]
 pub fn egui_pos2_into_vec2(pos: egui::Pos2) -> bevy_math::Vec2 {
     bevy_math::Vec2::new(pos.x, pos.y)
 }
 
 /// Converts [`egui::Vec2`] into [`bevy_math::Vec2`].
+#[inline(always)]
 pub fn egui_vec2_into_vec2(pos: egui::Vec2) -> bevy_math::Vec2 {
     bevy_math::Vec2::new(pos.x, pos.y)
+}
+
+/// Converts [`egui::Rect`] into [`bevy_math::Rect`].
+#[inline(always)]
+pub fn egui_rect_into_rect(rect: egui::Rect) -> bevy_math::Rect {
+    bevy_math::Rect {
+        min: egui_pos2_into_vec2(rect.min),
+        max: egui_pos2_into_vec2(rect.max),
+    }
 }
 
 pub(crate) trait QueryHelper<'w> {

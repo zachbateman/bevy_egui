@@ -94,7 +94,6 @@
 //!
 //! The same minimal example demonstrating running Egui passes manually.
 //!
-//!
 //! ## See also
 //!
 //! - [`bevy-inspector-egui`](https://github.com/jakobhellermann/bevy-inspector-egui)
