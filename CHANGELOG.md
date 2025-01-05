@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (as opposed to being initialised with a delay by a separate system),
   thanks to Bevy [required components](https://docs.rs/bevy/0.15.1/bevy/prelude/trait.Component.html#required-components).
 
+### Fixed
+
+- Fix clipboard error handling ([#347](https://github.com/vladbat00/bevy_egui/pull/347)).
+
 ## [0.31.1] - 30-Nov-2024
 
 ### Fixed
