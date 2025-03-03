@@ -64,7 +64,7 @@ name = "ui"
 required-features = ["render"]
 [[example]]
 name = "render_egui_to_image"
-required-features = ["render", "bevy/bevy_gizmos"]
+required-features = ["picking", "render", "bevy/bevy_gizmos"]
 
 [dependencies]
 egui = { version = "0.31", default-features = false }
@@ -104,8 +104,9 @@ version-sync = "0.9.4"
 bevy = { version = "0.15.0", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
-    "bevy_sprite",
     "bevy_pbr",
+    "bevy_mesh_picking_backend",
+    "bevy_sprite",
     "bevy_window",
     "bevy_winit",
     "android-game-activity",
