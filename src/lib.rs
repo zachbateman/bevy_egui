@@ -194,6 +194,20 @@ pub struct EguiGlobalSettings {
     pub enable_focused_non_window_context_updates: bool,
     /// Controls running of the input systems.
     pub input_system_settings: EguiInputSystemSettings,
+    /// Controls running of the [`absorb_bevy_input_system`] system, disabled by default.
+    ///
+    /// ## Considerations
+    ///
+    /// Enabling this system makes an assumption that `bevy_egui` takes priority in input handling
+    /// over other plugins and systems. This should work ok as long as there's no other system
+    /// clearing events the same way that might be in conflict with `bevy_egui`, and there's
+    /// no other system that needs a non-interrupted flow of events.
+    ///
+    /// ## Alternative
+    ///
+    /// Apply `run_if(not(egui_wants_input))` to your systems that need to be disabled while
+    /// Egui is using input.
+    pub enable_absorb_bevy_input_system: bool,
 }
 
 impl Default for EguiGlobalSettings {
@@ -201,6 +215,7 @@ impl Default for EguiGlobalSettings {
         Self {
             enable_focused_non_window_context_updates: true,
             input_system_settings: EguiInputSystemSettings::default(),
+            enable_absorb_bevy_input_system: false,
         }
     }
 }
@@ -788,6 +803,7 @@ impl Plugin for EguiPlugin {
         app.register_type::<EguiContextSettings>();
         app.init_resource::<EguiGlobalSettings>();
         app.init_resource::<ModifierKeysState>();
+        app.init_resource::<EguiWantsInput>();
         app.add_event::<EguiInputEvent>();
 
         #[cfg(feature = "render")]
@@ -903,7 +919,15 @@ impl Plugin for EguiPlugin {
                         .run_if(input_system_is_enabled(|s| s.run_write_ime_events_system)),
                 )
                     .in_set(EguiInputSet::ReadBevyEvents),
-                write_egui_input_system.in_set(EguiInputSet::WriteEguiEvents),
+                (
+                    write_egui_input_system,
+                    absorb_bevy_input_system
+                        .run_if(|settings: Res<EguiGlobalSettings>| {
+                            settings.enable_absorb_bevy_input_system
+                        })
+                        .run_if(egui_wants_input),
+                )
+                    .in_set(EguiInputSet::WriteEguiEvents),
             )
                 .chain()
                 .in_set(EguiPreUpdateSet::ProcessInput),
@@ -983,7 +1007,8 @@ impl Plugin for EguiPlugin {
         );
         app.add_systems(
             PostUpdate,
-            process_output_system.in_set(EguiPostUpdateSet::ProcessOutput),
+            (process_output_system, write_egui_wants_input_system)
+                .in_set(EguiPostUpdateSet::ProcessOutput),
         );
         #[cfg(feature = "picking")]
         app.add_systems(PostUpdate, capture_pointer_input_system);
