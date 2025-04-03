@@ -10,7 +10,7 @@
 [![Documentation](https://docs.rs/bevy_egui/badge.svg)](https://docs.rs/bevy_egui)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/bevyengine/bevy/blob/master/LICENSE)
 [![Downloads](https://img.shields.io/crates/d/bevy_egui.svg)](https://crates.io/crates/bevy_egui)
-[![Rust](https://github.com/vladbat00/bevy_egui/workflows/CI/badge.svg)](https://github.com/vladbat00/bevy_egui/actions)
+[![CI](https://github.com/vladbat00/bevy_egui/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/vladbat00/bevy_egui/actions)
 
 This crate provides an [Egui](https://github.com/emilk/egui) integration for the [Bevy](https://github.com/bevyengine/bevy) game engine.
 
