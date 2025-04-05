@@ -154,6 +154,7 @@ pub mod text_agent;
 #[cfg(all(feature = "manage_clipboard", target_arch = "wasm32",))]
 pub mod web_clipboard;
 
+use bevy_a11y::{AccessibilityRequested, AccessibilitySystem, ManageAccessibilityUpdates};
 pub use egui;
 
 use crate::input::*;
@@ -204,7 +205,7 @@ use bevy_render::{
 };
 use bevy_utils::HashSet;
 use bevy_window::{PrimaryWindow, Window};
-use bevy_winit::cursor::CursorIcon;
+use bevy_winit::{accessibility::AccessKitAdapters, cursor::CursorIcon};
 use output::process_output_system;
 #[cfg(all(
     feature = "manage_clipboard",
@@ -1007,7 +1008,7 @@ impl Plugin for EguiPlugin {
             (
                 EguiPostUpdateSet::EndPass,
                 EguiPostUpdateSet::ProcessOutput,
-                EguiPostUpdateSet::PostProcessOutput,
+                EguiPostUpdateSet::PostProcessOutput.before(AccessibilitySystem::Update),
             )
                 .chain(),
         );
@@ -1197,6 +1198,11 @@ impl Plugin for EguiPlugin {
             "egui.wgsl",
             bevy_render::render_resource::Shader::from_wgsl
         );
+
+        app.add_systems(
+            PostUpdate,
+            update_accessibility_system.in_set(EguiPostUpdateSet::PostProcessOutput),
+        );
     }
 
     #[cfg(feature = "render")]
@@ -1260,13 +1266,22 @@ pub struct EguiManagedTexture {
 /// Adds bevy_egui components to newly created windows.
 pub fn setup_new_windows_system(
     mut commands: Commands,
-    enable_multipass_for_primary_context: Option<Res<EnableMultipassForPrimaryContext>>,
     new_windows: Query<(Entity, Option<&PrimaryWindow>), (Added<Window>, Without<EguiContext>)>,
+    adapters: Option<NonSend<AccessKitAdapters>>,
+    mut manage_accessibility_updates: ResMut<ManageAccessibilityUpdates>,
+    enable_multipass_for_primary_context: Option<Res<EnableMultipassForPrimaryContext>>,
 ) {
     for (window, primary) in new_windows.iter() {
+        let context = EguiContext::default();
+        if let Some(adapters) = &adapters {
+            if adapters.get(&window).is_some() {
+                context.ctx.enable_accesskit();
+                **manage_accessibility_updates = false;
+            }
+        }
         // See the list of required components to check the full list of components we add.
         let mut window_commands = commands.entity(window);
-        window_commands.insert(EguiContext::default());
+        window_commands.insert(context);
         if enable_multipass_for_primary_context.is_some() && primary.is_some() {
             window_commands.insert(EguiMultipassSchedule::new(EguiContextPass));
         }
@@ -1644,6 +1659,27 @@ pub fn end_pass_system(
     for (mut ctx, egui_settings, mut full_output) in contexts.iter_mut() {
         if !egui_settings.run_manually {
             **full_output = Some(ctx.get_mut().end_pass());
+        }
+    }
+}
+
+/// Updates the states of [`ManageAccessibilityUpdates`] and [`AccessKitAdapters`].
+pub fn update_accessibility_system(
+    requested: Res<AccessibilityRequested>,
+    mut manage_accessibility_updates: ResMut<ManageAccessibilityUpdates>,
+    outputs: Query<(Entity, &EguiOutput)>,
+    mut adapters: NonSendMut<AccessKitAdapters>,
+) {
+    if requested.get() {
+        for (entity, output) in &outputs {
+            if let Some(adapter) = adapters.get_mut(&entity) {
+                if let Some(update) = &output.platform_output.accesskit_update {
+                    **manage_accessibility_updates = false;
+                    adapter.update_if_active(|| update.clone());
+                } else if !**manage_accessibility_updates {
+                    **manage_accessibility_updates = true;
+                }
+            }
         }
     }
 }
