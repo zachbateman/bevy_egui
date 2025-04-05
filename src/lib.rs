@@ -1020,8 +1020,7 @@ impl Plugin for EguiPlugin {
             (
                 EguiPostUpdateSet::EndPass,
                 EguiPostUpdateSet::ProcessOutput,
-                EguiPostUpdateSet::PostProcessOutput
-                    .before(bevy_a11y::AccessibilitySystem::Update),
+                EguiPostUpdateSet::PostProcessOutput.before(bevy_a11y::AccessibilitySystem::Update),
             )
                 .chain(),
         );
