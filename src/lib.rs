@@ -95,6 +95,10 @@
 //!
 //! Showcasing some more advanced UI, rendering images, hidpi scaling.
 //!
+//! ### absorb_input ([live page](https://vladbat00.github.io/bevy_egui/absorb_input), source: [examples/absorb_input.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/absorb_input.rs))
+//!
+//! Demonstrating the available options for absorbing input when Egui is using pointer or keyboard.
+//!
 //! ### color_test ([live page](https://vladbat00.github.io/bevy_egui/color_test), source: [examples/color_test.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/color_test.rs))
 //!
 //! Rendering test from [egui.rs](https://egui.rs). We don't fully pass it, help is wanted ([#291](https://github.com/vladbat00/bevy_egui/issues/291)).
@@ -127,7 +131,7 @@
 //!
 //! The minimal usage example from this readme.
 //!
-//! ### simple_multipass ([live page](https://vladbat00.github.io/bevy_egui/simple_multipass), source: [examples/simple_multipass.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/simple_multipass.rs))
+//! ### run_manually ([live page](https://vladbat00.github.io/bevy_egui/run_manually), source: [examples/run_manually.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/run_manually.rs))
 //!
 //! The same minimal example demonstrating running Egui passes manually.
 //!
