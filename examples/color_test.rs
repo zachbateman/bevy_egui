@@ -1,4 +1,5 @@
 use bevy::{
+    math::primitives::Rectangle,
     prelude::{MeshMaterial2d, *},
     render::render_resource::LoadOp,
     window::PrimaryWindow,
@@ -79,7 +80,7 @@ fn setup_system(
     };
     let mut image = bevy::image::Image {
         // You should use `0` so that the pixels are transparent.
-        data: vec![0; (size.width * size.height * 4) as usize],
+        data: Some(vec![0; (size.width * size.height * 4) as usize]),
         ..default()
     };
     image.texture_descriptor.usage |= TextureUsages::RENDER_ATTACHMENT;
@@ -141,8 +142,7 @@ fn update_image_size_system(
         let image = images
             .get_mut(&egui_render_to_image.handle)
             .expect("Expected a created image");
-        image
-            .data
+        (image.data.as_mut().expect("image data"))
             .resize((window.physical_width() * new_height * 4) as usize, 0);
         image.texture_descriptor.size.width = window.physical_width();
         image.texture_descriptor.size.height = new_height;

@@ -85,7 +85,7 @@ fn setup_worldspace_system(
         };
         let mut image = Image {
             // You should use `0` so that the pixels are transparent.
-            data: vec![0; (size.width * size.height * 4) as usize],
+            data: Some(vec![0; (size.width * size.height * 4) as usize]),
             ..default()
         };
         image.texture_descriptor.usage |= TextureUsages::RENDER_ATTACHMENT;
@@ -120,7 +120,7 @@ fn setup_worldspace_system(
                 load_op: LoadOp::Clear(Color::srgb_u8(43, 44, 47).to_linear().into()),
             },
             // We want the "tablet" mesh behind to react to pointer inputs.
-            PickingBehavior {
+            Pickable {
                 should_block_lower: false,
                 is_hoverable: true,
             },
@@ -153,9 +153,11 @@ fn setup_worldspace_system(
 fn draw_gizmos_system(
     mut gizmos: Gizmos,
     egui_mesh_query: Query<&Transform, With<EguiRenderToImage>>,
-) {
-    let egui_mesh_transform = egui_mesh_query.single();
+) -> Result {
+    let egui_mesh_transform = egui_mesh_query.single()?;
     gizmos.axes(*egui_mesh_transform, 0.1);
+
+    Ok(())
 }
 
 fn handle_over_system(

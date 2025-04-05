@@ -80,7 +80,7 @@ fn ui_first_window_system(
     mut egui_ctx: Query<&mut EguiContext, With<PrimaryWindow>>,
 ) {
     let bevy_texture_id = egui_user_textures.add_image(images.bevy_icon.clone_weak());
-    let Ok(mut ctx) = egui_ctx.get_single_mut() else {
+    let Ok(mut ctx) = egui_ctx.single_mut() else {
         return;
     };
     egui::Window::new("First Window")
@@ -110,7 +110,7 @@ fn ui_second_window_system(
     mut egui_ctx: Query<&mut EguiContext, Without<PrimaryWindow>>,
 ) {
     let bevy_texture_id = egui_user_textures.add_image(images.bevy_icon.clone_weak());
-    let Ok(mut ctx) = egui_ctx.get_single_mut() else {
+    let Ok(mut ctx) = egui_ctx.single_mut() else {
         return;
     };
     egui::Window::new("Second Window")

@@ -154,7 +154,6 @@ pub mod text_agent;
 #[cfg(all(feature = "manage_clipboard", target_arch = "wasm32",))]
 pub mod web_clipboard;
 
-use bevy_a11y::{AccessibilityRequested, AccessibilitySystem, ManageAccessibilityUpdates};
 pub use egui;
 
 use crate::input::*;
@@ -181,7 +180,7 @@ use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::{
     prelude::*,
     query::{QueryData, QueryEntityError},
-    schedule::{apply_deferred, InternedScheduleLabel, ScheduleLabel},
+    schedule::{InternedScheduleLabel, ScheduleLabel},
     system::SystemParam,
 };
 #[cfg(feature = "render")]
@@ -193,6 +192,9 @@ use bevy_picking::{
     backend::{HitData, PointerHits},
     pointer::{PointerId, PointerLocation},
 };
+#[cfg(feature = "render")]
+use bevy_platform_support::collections::HashMap;
+use bevy_platform_support::collections::HashSet;
 use bevy_reflect::Reflect;
 #[cfg(feature = "picking")]
 use bevy_render::camera::NormalizedRenderTarget;
@@ -203,9 +205,8 @@ use bevy_render::{
     render_resource::{LoadOp, SpecializedRenderPipelines},
     ExtractSchedule, Render, RenderApp, RenderSet,
 };
-use bevy_utils::HashSet;
 use bevy_window::{PrimaryWindow, Window};
-use bevy_winit::{accessibility::AccessKitAdapters, cursor::CursorIcon};
+use bevy_winit::cursor::CursorIcon;
 use output::process_output_system;
 #[cfg(all(
     feature = "manage_clipboard",
@@ -496,7 +497,7 @@ pub struct EguiFullOutput(pub Option<egui::FullOutput>);
 ///
 /// The resource is available only if `manage_clipboard` feature is enabled.
 #[cfg(all(feature = "manage_clipboard", not(target_os = "android")))]
-#[derive(Default, bevy_ecs::system::Resource)]
+#[derive(Default, Resource)]
 pub struct EguiClipboard {
     #[cfg(not(target_arch = "wasm32"))]
     clipboard: thread_local::ThreadLocal<Option<RefCell<Clipboard>>>,
@@ -803,10 +804,10 @@ impl EguiRenderToImage {
 }
 
 /// A resource for storing `bevy_egui` user textures.
-#[derive(Clone, bevy_ecs::system::Resource, ExtractResource)]
+#[derive(Clone, Resource, ExtractResource)]
 #[cfg(feature = "render")]
 pub struct EguiUserTextures {
-    textures: bevy_utils::HashMap<Handle<Image>, u64>,
+    textures: HashMap<Handle<Image>, u64>,
     free_list: Vec<u64>,
 }
 
@@ -814,7 +815,7 @@ pub struct EguiUserTextures {
 impl Default for EguiUserTextures {
     fn default() -> Self {
         Self {
-            textures: bevy_utils::HashMap::new(),
+            textures: HashMap::default(),
             free_list: vec![0],
         }
     }
@@ -1003,12 +1004,24 @@ impl Plugin for EguiPlugin {
             )
                 .chain(),
         );
+        #[cfg(not(feature = "accesskit_placeholder"))]
         app.configure_sets(
             PostUpdate,
             (
                 EguiPostUpdateSet::EndPass,
                 EguiPostUpdateSet::ProcessOutput,
-                EguiPostUpdateSet::PostProcessOutput.before(AccessibilitySystem::Update),
+                EguiPostUpdateSet::PostProcessOutput,
+            )
+                .chain(),
+        );
+        #[cfg(feature = "accesskit_placeholder")]
+        app.configure_sets(
+            PostUpdate,
+            (
+                EguiPostUpdateSet::EndPass,
+                EguiPostUpdateSet::ProcessOutput,
+                EguiPostUpdateSet::PostProcessOutput
+                    .before(bevy::a11y::AccessibilitySystem::Update),
             )
                 .chain(),
         );
@@ -1022,7 +1035,7 @@ impl Plugin for EguiPlugin {
             PreStartup,
             (
                 setup_new_windows_system,
-                apply_deferred,
+                ApplyDeferred,
                 update_ui_size_and_scale_system,
             )
                 .chain()
@@ -1034,7 +1047,7 @@ impl Plugin for EguiPlugin {
             PreUpdate,
             (
                 setup_new_windows_system,
-                apply_deferred,
+                ApplyDeferred,
                 update_ui_size_and_scale_system,
             )
                 .chain()
@@ -1199,6 +1212,7 @@ impl Plugin for EguiPlugin {
             bevy_render::render_resource::Shader::from_wgsl
         );
 
+        #[cfg(feature = "accesskit_placeholder")]
         app.add_systems(
             PostUpdate,
             update_accessibility_system.in_set(EguiPostUpdateSet::PostProcessOutput),
@@ -1251,8 +1265,8 @@ fn input_system_is_enabled(
 
 /// Contains textures allocated and painted by Egui.
 #[cfg(feature = "render")]
-#[derive(bevy_ecs::system::Resource, Deref, DerefMut, Default)]
-pub struct EguiManagedTextures(pub bevy_utils::HashMap<(Entity, u64), EguiManagedTexture>);
+#[derive(Resource, Deref, DerefMut, Default)]
+pub struct EguiManagedTextures(pub HashMap<(Entity, u64), EguiManagedTexture>);
 
 /// Represents a texture allocated and painted by Egui.
 #[cfg(feature = "render")]
@@ -1267,12 +1281,17 @@ pub struct EguiManagedTexture {
 pub fn setup_new_windows_system(
     mut commands: Commands,
     new_windows: Query<(Entity, Option<&PrimaryWindow>), (Added<Window>, Without<EguiContext>)>,
-    adapters: Option<NonSend<AccessKitAdapters>>,
-    mut manage_accessibility_updates: ResMut<ManageAccessibilityUpdates>,
+    #[cfg(feature = "accesskit_placeholder")] adapters: Option<
+        NonSend<bevy_winit::accessibility::AccessKitAdapters>,
+    >,
+    #[cfg(feature = "accesskit_placeholder")] mut manage_accessibility_updates: ResMut<
+        bevy::a11y::ManageAccessibilityUpdates,
+    >,
     enable_multipass_for_primary_context: Option<Res<EnableMultipassForPrimaryContext>>,
 ) {
     for (window, primary) in new_windows.iter() {
         let context = EguiContext::default();
+        #[cfg(feature = "accesskit_placeholder")]
         if let Some(adapters) = &adapters {
             if adapters.get(&window).is_some() {
                 context.ctx.enable_accesskit();
@@ -1407,7 +1426,7 @@ pub fn capture_pointer_input_system(
             if let Some((entity, mut ctx, settings)) = egui_context.get_some_mut(id.entity()) {
                 if settings.capture_pointer_input && ctx.get_mut().wants_pointer_input() {
                     let entry = (entity, HitData::new(entity, 0.0, None, None));
-                    output.send(PointerHits::new(
+                    output.write(PointerHits::new(
                         *pointer,
                         Vec::from([entry]),
                         PICKING_ORDER,
@@ -1664,11 +1683,12 @@ pub fn end_pass_system(
 }
 
 /// Updates the states of [`ManageAccessibilityUpdates`] and [`AccessKitAdapters`].
+#[cfg(feature = "accesskit_placeholder")]
 pub fn update_accessibility_system(
-    requested: Res<AccessibilityRequested>,
-    mut manage_accessibility_updates: ResMut<ManageAccessibilityUpdates>,
+    requested: Res<bevy::a11y::AccessibilityRequested>,
+    mut manage_accessibility_updates: ResMut<bevy::a11y::ManageAccessibilityUpdates>,
     outputs: Query<(Entity, &EguiOutput)>,
-    mut adapters: NonSendMut<AccessKitAdapters>,
+    mut adapters: NonSendMut<bevy_winit::accessibility::AccessKitAdapters>,
 ) {
     if requested.get() {
         for (entity, output) in &outputs {
@@ -1700,7 +1720,7 @@ pub struct MultiPassEguiQuery {
 /// this component, runs the [`EguiContextPass`] schedule once independently.
 pub fn run_egui_context_pass_loop_system(world: &mut World) {
     let mut contexts_query = world.query::<MultiPassEguiQuery>();
-    let mut used_schedules = HashSet::new();
+    let mut used_schedules = HashSet::<InternedScheduleLabel>::default();
 
     let mut multipass_contexts: Vec<_> = contexts_query
         .iter_mut(world)

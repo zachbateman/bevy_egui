@@ -8,6 +8,8 @@ use bevy_ecs::{
     event::EventWriter,
     system::{NonSend, Query},
 };
+#[cfg(windows)]
+use bevy_platform_support::collections::HashMap;
 use bevy_window::RequestRedraw;
 use bevy_winit::{cursor::CursorIcon, EventLoopProxy, WakeUp};
 use std::{sync::Arc, time::Duration};
@@ -26,7 +28,7 @@ pub fn process_output_system(
     #[cfg(all(feature = "manage_clipboard", not(target_os = "android")))]
     mut egui_clipboard: bevy_ecs::system::ResMut<crate::EguiClipboard>,
     mut event: EventWriter<RequestRedraw>,
-    #[cfg(windows)] mut last_cursor_icon: Local<bevy_utils::HashMap<Entity, egui::CursorIcon>>,
+    #[cfg(windows)] mut last_cursor_icon: Local<HashMap<Entity, egui::CursorIcon>>,
     event_loop_proxy: Option<NonSend<EventLoopProxy<WakeUp>>>,
 ) {
     let mut should_request_redraw = false;
@@ -136,6 +138,6 @@ pub fn process_output_system(
     }
 
     if should_request_redraw {
-        event.send(RequestRedraw);
+        event.write(RequestRedraw);
     }
 }
