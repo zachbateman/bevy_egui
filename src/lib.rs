@@ -91,43 +91,43 @@
 //! cargo run --example ui
 //! ```
 //!
-//! ### ui ([live page](https://vladbat00.github.io/bevy_egui/ui), source: [examples/ui.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/ui.rs))
+//! ### ui ([live page](https://vladbat00.github.io/bevy_egui/ui), source: [examples/ui.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/ui.rs))
 //!
 //! Showcasing some more advanced UI, rendering images, hidpi scaling.
 //!
-//! ### color_test ([live page](https://vladbat00.github.io/bevy_egui/color_test), source: [examples/color_test.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/color_test.rs))
+//! ### color_test ([live page](https://vladbat00.github.io/bevy_egui/color_test), source: [examples/color_test.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/color_test.rs))
 //!
 //! Rendering test from [egui.rs](https://egui.rs). We don't fully pass it, help is wanted ([#291](https://github.com/vladbat00/bevy_egui/issues/291)).
 //!
-//! ### side_panel_2d ([live page](https://vladbat00.github.io/bevy_egui/side_panel_2d), source: [examples/side_panel_2d.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/side_panel_2d.rs))
+//! ### side_panel_2d ([live page](https://vladbat00.github.io/bevy_egui/side_panel_2d), source: [examples/side_panel_2d.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/side_panel_2d.rs))
 //!
 //! Showing how to display an Egui side panel and transform a camera with a perspective projection to make rendering centered relative to the remaining screen area.
 //!
-//! ### side_panel_3d ([live page](https://vladbat00.github.io/bevy_egui/side_panel_3d), source: [examples/side_panel_3d.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/side_panel_3d.rs))
+//! ### side_panel_3d ([live page](https://vladbat00.github.io/bevy_egui/side_panel_3d), source: [examples/side_panel_3d.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/side_panel_3d.rs))
 //!
 //! Showing how to display an Egui side panel and transform a camera with a orthographic projection to make rendering centered relative to the remaining screen area.
 //!
-//! ### render_egui_to_image ([live page](https://vladbat00.github.io/bevy_egui/render_egui_to_image), source: [examples/render_egui_to_image.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/render_egui_to_image.rs))
+//! ### render_egui_to_image ([live page](https://vladbat00.github.io/bevy_egui/render_egui_to_image), source: [examples/render_egui_to_image.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/render_egui_to_image.rs))
 //!
 //! Rendering UI to an image (texture) and then using it as a mesh material texture.
 //!
-//! ### render_to_image_widget ([live page](https://vladbat00.github.io/bevy_egui/render_to_image_widget), source: [examples/render_to_image_widget.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/render_to_image_widget.rs))
+//! ### render_to_image_widget ([live page](https://vladbat00.github.io/bevy_egui/render_to_image_widget), source: [examples/render_to_image_widget.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/render_to_image_widget.rs))
 //!
 //! Rendering to a texture with Bevy and showing it as an Egui image widget.
 //!
-//! ### two_windows (source: [examples/two_windows.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/two_windows.rs))
+//! ### two_windows (source: [examples/two_windows.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/two_windows.rs))
 //!
 //! Setting up two windows with an Egui context for each.
 //!
-//! ### paint_callback ([live page](https://vladbat00.github.io/bevy_egui/paint_callback), source: [examples/paint_callback.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/paint_callback.rs))
+//! ### paint_callback ([live page](https://vladbat00.github.io/bevy_egui/paint_callback), source: [examples/paint_callback.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/paint_callback.rs))
 //!
 //! Using Egui paint callbacks.
 //!
-//! ### simple ([live page](https://vladbat00.github.io/bevy_egui/simple), source: [examples/simple.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/simple.rs))
+//! ### simple ([live page](https://vladbat00.github.io/bevy_egui/simple), source: [examples/simple.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/simple.rs))
 //!
 //! The minimal usage example from this readme.
 //!
-//! ### simple_multipass ([live page](https://vladbat00.github.io/bevy_egui/simple_multipass), source: [examples/simple_multipass.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.1/examples/simple_multipass.rs))
+//! ### simple_multipass ([live page](https://vladbat00.github.io/bevy_egui/simple_multipass), source: [examples/simple_multipass.rs](https://github.com/vladbat00/bevy_egui/blob/v0.34.0-rc.2/examples/simple_multipass.rs))
 //!
 //! The same minimal example demonstrating running Egui passes manually.
 //!
@@ -1021,7 +1021,7 @@ impl Plugin for EguiPlugin {
                 EguiPostUpdateSet::EndPass,
                 EguiPostUpdateSet::ProcessOutput,
                 EguiPostUpdateSet::PostProcessOutput
-                    .before(bevy::a11y::AccessibilitySystem::Update),
+                    .before(bevy_a11y::AccessibilitySystem::Update),
             )
                 .chain(),
         );
@@ -1285,7 +1285,7 @@ pub fn setup_new_windows_system(
         NonSend<bevy_winit::accessibility::AccessKitAdapters>,
     >,
     #[cfg(feature = "accesskit_placeholder")] mut manage_accessibility_updates: ResMut<
-        bevy::a11y::ManageAccessibilityUpdates,
+        bevy_a11y::ManageAccessibilityUpdates,
     >,
     enable_multipass_for_primary_context: Option<Res<EnableMultipassForPrimaryContext>>,
 ) {
@@ -1685,8 +1685,8 @@ pub fn end_pass_system(
 /// Updates the states of [`ManageAccessibilityUpdates`] and [`AccessKitAdapters`].
 #[cfg(feature = "accesskit_placeholder")]
 pub fn update_accessibility_system(
-    requested: Res<bevy::a11y::AccessibilityRequested>,
-    mut manage_accessibility_updates: ResMut<bevy::a11y::ManageAccessibilityUpdates>,
+    requested: Res<bevy_a11y::AccessibilityRequested>,
+    mut manage_accessibility_updates: ResMut<bevy_a11y::ManageAccessibilityUpdates>,
     outputs: Query<(Entity, &EguiOutput)>,
     mut adapters: NonSendMut<bevy_winit::accessibility::AccessKitAdapters>,
 ) {

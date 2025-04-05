@@ -1,6 +1,6 @@
 [package]
 name = "bevy_egui"
-version = "0.34.0-rc.1"
+version = "0.34.0-rc.2"
 # Needed for LazyLock https://doc.rust-lang.org/stable/std/sync/struct.LazyLock.html
 rust-version = "1.80.0"
 authors = ["vladbat00 <vladyslav.batyrenko@gmail.com>"]
@@ -11,8 +11,7 @@ repository = "https://github.com/vladbat00/bevy_egui"
 exclude = ["assets/**/*", ".github/**/*"]
 
 [package.metadata.docs.rs]
-features = ["bevy_winit/x11"]
-all-features = true
+features = ["bevy_winit/x11", "immutable_ctx"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
@@ -71,7 +70,7 @@ name = "render_egui_to_image"
 required-features = ["picking", "render", "bevy/bevy_gizmos"]
 
 [dependencies]
-egui = { version = "0.31", default-features = false, features = ["accesskit"] }
+egui = { version = "0.31", default-features = false }
 bevy_a11y = { version = "0.16.0-rc", optional = true }
 bevy_app = "0.16.0-rc"
 bevy_derive = "0.16.0-rc"
