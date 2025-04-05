@@ -20,7 +20,7 @@ fn main() {
         })
         .add_systems(Startup, setup_scene_system)
         .add_systems(EguiContextPass, ui_system)
-        // You can wrap your systems with the `egui_wants_input` run condition if you
+        // You can wrap your systems with the `egui_wants_any_pointer_input`, `egui_wants_any_keyboard_input` run conditions if you
         // want to disable them while Egui is using input.
         //
         // As an alternative (a less safe one), you can set `EguiGlobalSettings::enable_absorb_bevy_input_system`

@@ -342,8 +342,8 @@ pub struct EguiGlobalSettings {
     ///
     /// ## Alternative
     ///
-    /// Apply `run_if(not(egui_wants_input))` to your systems that need to be disabled while
-    /// Egui is using input.
+    /// Apply `run_if(not(egui_wants_any_pointer_input))` or `run_if(not(egui_wants_any_keyboard_input))` to your systems
+    /// that need to be disabled while Egui is using input (see the [`egui_wants_any_pointer_input`], [`egui_wants_any_keyboard_input`] run conditions).
     pub enable_absorb_bevy_input_system: bool,
 }
 
