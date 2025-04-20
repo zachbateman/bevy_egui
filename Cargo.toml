@@ -1,6 +1,6 @@
 [package]
 name = "bevy_egui"
-version = "0.34.0-rc.2"
+version = "0.34.0-rc.3"
 # Needed for LazyLock https://doc.rust-lang.org/stable/std/sync/struct.LazyLock.html
 rust-version = "1.80.0"
 authors = ["vladbat00 <vladyslav.batyrenko@gmail.com>"]
@@ -87,7 +87,7 @@ bevy_reflect = "0.16.0-rc"
 bevy_time = "0.16.0-rc"
 bevy_winit = "0.16.0-rc"
 bevy_window = "0.16.0-rc"
-bevy_platform_support = "0.16.0-rc"
+bevy_platform = "0.16.0-rc"
 
 # `open_url` feature
 webbrowser = { version = "1.0.1", optional = true }
