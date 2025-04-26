@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix panic if `bevy_egui/picking` is enabled, but `bevy/bevy_picking` is not.
+- Fix panic if `bevy_egui/picking` is enabled, but `bevy/bevy_picking` is not (or `PickingPlugin` is not added).
 
 ## [0.34.0] - 25-Apr-2025
 
