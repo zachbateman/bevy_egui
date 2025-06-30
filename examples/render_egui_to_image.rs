@@ -36,7 +36,7 @@ impl Default for Name {
     }
 }
 
-fn update_screenspace_system(mut name: ResMut<Name>, mut contexts: EguiContexts) {
+fn update_screenspace_system(mut name: ResMut<Name>, mut contexts: EguiContexts) -> Result {
     egui::Window::new("Screenspace UI").show(contexts.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             ui.label("Your name:");
@@ -47,6 +47,7 @@ fn update_screenspace_system(mut name: ResMut<Name>, mut contexts: EguiContexts)
             name.0
         ));
     });
+    Ok(())
 }
 
 fn update_worldspace_system(
