@@ -10,7 +10,7 @@ use bevy_ecs::{
 use bevy_platform::collections::HashMap;
 use bevy_window::RequestRedraw;
 use bevy_winit::{cursor::CursorIcon, EventLoopProxy, WakeUp};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 /// Reads Egui output.
 pub fn process_output_system(
@@ -56,8 +56,8 @@ pub fn process_output_system(
         } = full_output;
         let paint_jobs = ctx.tessellate(shapes, pixels_per_point);
 
-        render_output.paint_jobs = Arc::new(paint_jobs);
-        render_output.textures_delta = Arc::new(textures_delta);
+        render_output.paint_jobs = paint_jobs;
+        render_output.textures_delta = textures_delta;
         egui_output.platform_output = platform_output;
 
         for command in &egui_output.platform_output.commands {
