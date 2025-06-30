@@ -1,7 +1,4 @@
-use bevy::{
-    ecs::schedule::ScheduleLabel, prelude::*, render::render_resource::LoadOp,
-    window::PrimaryWindow,
-};
+use bevy::{ecs::schedule::ScheduleLabel, prelude::*, window::PrimaryWindow};
 use bevy_egui::{EguiContexts, EguiMultipassSchedule, EguiPlugin, EguiPrimaryContextPass};
 use bevy_render::{camera::RenderTarget, view::RenderLayers};
 use wgpu_types::{Extent3d, TextureUsages};
@@ -37,7 +34,7 @@ impl Default for Name {
 }
 
 fn update_screenspace_system(mut name: ResMut<Name>, mut contexts: EguiContexts) -> Result {
-    egui::Window::new("Screenspace UI").show(contexts.ctx_mut(), |ui| {
+    egui::Window::new("Screenspace UI").show(contexts.ctx_mut()?, |ui| {
         ui.horizontal(|ui| {
             ui.label("Your name:");
             ui.text_edit_singleline(&mut name.0);
