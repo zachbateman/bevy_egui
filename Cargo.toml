@@ -76,36 +76,58 @@ required-features = ["picking", "render", "bevy/bevy_gizmos"]
 name = "file_browse"
 required-features = ["render"]
 
+[patch.crates-io]
+bevy = { path = "../bevy" }
+bevy_winit = { path = "../bevy/crates/bevy_winit" }
+
 [dependencies]
 egui = { version = "0.31", default-features = false }
-bevy_a11y = { version = "0.16.0", optional = true }
-bevy_app = "0.16.0"
-bevy_derive = "0.16.0"
-bevy_ecs = "0.16.0"
-bevy_input = "0.16.0"
-bevy_log = "0.16.0"
-bevy_math = "0.16.0"
-bevy_reflect = "0.16.0"
-bevy_time = "0.16.0"
-bevy_transform = { version = "0.16.1", optional = true }
-bevy_winit = "0.16.0"
-bevy_window = "0.16.0"
-bevy_platform = "0.16.0"
+# bevy_a11y = { version = "0.16.0", optional = true }
+# bevy_app = "0.16.0"
+# bevy_derive = "0.16.0"
+# bevy_ecs = "0.16.0"
+# bevy_input = "0.16.0"
+# bevy_log = "0.16.0"
+# bevy_math = "0.16.0"
+# bevy_reflect = "0.16.0"
+# bevy_time = "0.16.0"
+# bevy_transform = { version = "0.16.1", optional = true }
+# bevy_winit = "0.16.0"
+# bevy_window = "0.16.0"
+# bevy_platform = "0.16.0"
+bevy_a11y = { path = "../bevy/crates/bevy_a11y", optional = true }
+bevy_app = { path = "../bevy/crates/bevy_app" }
+bevy_derive = { path = "../bevy/crates/bevy_derive" }
+bevy_ecs = { path = "../bevy/crates/bevy_ecs" }
+bevy_input = { path = "../bevy/crates/bevy_input" }
+bevy_log = { path = "../bevy/crates/bevy_log" }
+bevy_math = { path = "../bevy/crates/bevy_math" }
+bevy_reflect = { path = "../bevy/crates/bevy_reflect" }
+bevy_time = { path = "../bevy/crates/bevy_time" }
+bevy_transform = { path = "../bevy/crates/bevy_transform", optional = true }
+bevy_winit = { path = "../bevy/crates/bevy_winit" }
+bevy_window = { path = "../bevy/crates/bevy_window" }
+bevy_platform = { path = "../bevy/crates/bevy_platform" }
 
 # `open_url` feature
 webbrowser = { version = "1.0.1", optional = true }
 
 # `render` feature
 bytemuck = { version = "1", optional = true }
-bevy_asset = { version = "0.16.0", optional = true }
-bevy_core_pipeline = { version = "0.16.1", optional = true }
-bevy_image = { version = "0.16.0", optional = true }
-bevy_render = { version = "0.16.0", optional = true }
+# bevy_asset = { version = "0.16.0", optional = true }
+# bevy_core_pipeline = { version = "0.16.1", optional = true }
+# bevy_image = { version = "0.16.0", optional = true }
+# bevy_render = { version = "0.16.0", optional = true }
+bevy_asset = { path = "../bevy/crates/bevy_asset", optional = true }
+bevy_core_pipeline = { path = "../bevy/crates/bevy_core_pipeline", optional = true }
+bevy_image = { path = "../bevy/crates/bevy_image", optional = true }
+bevy_render = { path = "../bevy/crates/bevy_render", optional = true }
 encase = { version = "0.10", optional = true }
 wgpu-types = { version = "24.0", optional = true }
 
 # `picking` feature
-bevy_picking = { version = "0.16.0", optional = true, features = ["bevy_mesh_picking_backend"] }
+# bevy_picking = { version = "0.16.0", optional = true, features = ["bevy_mesh_picking_backend"] }
+bevy_picking = { path = "../bevy/crates/bevy_picking", optional = true, features = ["bevy_mesh_picking_backend"] }
 
 # `manage_clipboard` feature
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
@@ -114,7 +136,8 @@ thread_local = { version = "1.1.0", optional = true }
 
 [dev-dependencies]
 version-sync = "0.9.5"
-bevy = { version = "0.16.0", default-features = false, features = [
+# bevy = { version = "0.16.0", default-features = false, features = [
+bevy = { path = "../bevy", default-features = false, features = [
     "accesskit_unix",
     "bevy_log",
     "bevy_asset",
